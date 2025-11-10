@@ -1,3 +1,146 @@
+# 🚀 Extrator de Históricos Acadêmicos - UFOPA (atualizado)
+
+Aplicação web para automatizar a extração de Componentes Pendentes e Resumo de Carga Horária a partir de históricos em PDF.
+
+> Este README foi atualizado para refletir suporte a arquivos Excel modernos (.xlsx), instruções de execução no Windows (PowerShell) e dicas de depuração.
+
+---
+
+## O que o projeto faz
+
+- Recebe múltiplos PDFs de históricos e um arquivo de controle (planilha de percentuais).
+- Extrai componentes curriculares obrigatórios pendentes (ignora ENADE), marca disciplinas "(Matriculado)" quando identificadas e calcula um resumo de carga horária pendente.
+- Gera três relatórios em `generated_reports/`:
+  - `relatorio_componentes.xlsx` (Excel formatado)
+  - `relatorio_final.csv` (compacto, delimitador `;`)
+  - `relatorio_historicos.txt` (linhas simples)
+
+---
+
+## Principais melhorias nesta versão
+
+- Suporte para arquivos de percentuais em `.xls` e `.xlsx`. O backend detecta automaticamente a extensão e usa `xlrd` para `.xls` e `openpyxl` para `.xlsx`.
+- Frontend envia os campos `pdf_files` (múltiplos) e `excel_file` (um arquivo). O backend espera exatamente esses nomes.
+- `requirements.txt` foi atualizado para indicar `xlrd==1.2.0` (compatibilidade com arquivos `.xls`).
+
+---
+
+## Requisitos
+
+- Python 3.8+ (recomendado 3.11)
+- pip
+
+Dependências (já listadas em `requirements.txt`):
+
+- Flask
+- Flask-CORS
+- pdfplumber
+- xlrd==1.2.0
+- openpyxl
+
+---
+
+## Instalação e execução (PowerShell - Windows)
+
+Abra o PowerShell e execute os passos abaixo na pasta do projeto `extrator-historicos-ufopa`.
+
+1) Navegue até a pasta do projeto:
+
+```powershell
+cd "C:\Users\User\Documents\Organização de planilhas\Extração_de_disciplinas_pendentes\Históricos\extrator-historicos-ufopa"
+```
+
+2) Crie e ative um ambiente virtual:
+
+```powershell
+python -m venv .\venv
+.\venv\Scripts\Activate
+```
+
+3) Atualize pip e instale dependências:
+
+```powershell
+pip install --upgrade pip
+pip install -r .\requirements.txt
+```
+
+4) Inicie o servidor Flask:
+
+```powershell
+python .\app.py
+```
+
+5) Abra no navegador: http://127.0.0.1:5000
+
+---
+
+## Uso da interface
+
+1. Selecione os arquivos PDF (múltiplos) no primeiro campo.
+2. Selecione o arquivo de percentuais (`.xls` ou `.xlsx`) no segundo campo.
+3. Clique em "Iniciar Extração".
+4. Acompanhe as mensagens na área de logs; ao final, os links para download aparecerão.
+
+---
+
+## Contrato da API (para integrações)
+
+- Endpoint: `POST /upload_and_extract`
+- Form data:
+  - `pdf_files` — arquivos PDF (campo repetível / múltiplo)
+  - `excel_file` — arquivo de percentuais (`.xls` ou `.xlsx`)
+- Resposta JSON (success):
+  ```json
+  {
+    "status": "success",
+    "message": "Extração e geração de relatórios concluídas com sucesso!",
+    "download_links": {
+      "excel_report": "/download/relatorio_componentes.xlsx",
+      "csv_report": "/download/relatorio_final.csv",
+      "txt_report": "/download/relatorio_historicos.txt"
+    }
+  }
+  ```
+
+Os arquivos podem ser baixados via `GET /download/<filename>`.
+
+---
+
+## Estrutura de pastas geradas
+
+- `uploads/` — arquivos enviados temporariamente (limpo a cada execução)
+- `generated_reports/` — relatórios gerados (relatório Excel, CSV e TXT)
+
+---
+
+## Solução de problemas
+
+- Erro ao abrir XLS:
+  - Verifique se o arquivo é `.xls` e, se for, assegure que `xlrd==1.2.0` esteja instalado (já fixado em `requirements.txt`).
+- Planilha com layout diferente:
+  - O script atual lê dados a partir da linha 10 e usa Coluna B (matrícula) e Coluna G (percentual). Se seu layout for diferente, posso ajustar o script para corresponder ao seu arquivo.
+- Upload não funciona / erro CORS: confirme que `Flask-CORS` está instalado (aplicação já habilita CORS no `app.py`).
+- Tempo de processamento / arquivos grandes: aumente `app.config['MAX_CONTENT_LENGTH']` em `app.py` se necessário.
+- Permissões: o servidor grava em disco (`uploads/`, `generated_reports/`); verifique permissões de escrita.
+
+---
+
+## Testes sugeridos
+
+1. Teste rápido: coloque 2-3 PDFs em `pdfs/` (ou use a UI) e uma planilha `.xls` ou `.xlsx` com o formato esperado e verifique se os três relatórios são gerados.
+2. Teste `.xls` e `.xlsx` para confirmar ambas as rotas de leitura funcionam.
+
+---
+
+## Próximos passos (opcionais)
+
+- Adicionar logging em arquivo (INFO/DEBUG) para facilitar diagnóstico.
+- Adicionar testes unitários para `carregar_percentuais()` usando amostras `.xls` e `.xlsx`.
+- Tornar o caminho da planilha e offsets configuráveis via variáveis de ambiente ou UI avançada.
+
+---
+
+Se quiser, eu posso adaptar o carregamento dos percentuais ao layout exato do seu arquivo — envie as primeiras 10-15 linhas (CSV exportado) e eu faço a adaptação e um teste rápido.
 # 🚀 Extrator de Históricos Acadêmicos - UFOPA
 
 > Uma aplicação web simples para automatizar a extração de dados de Componentes Pendentes e Carga Horária de Históricos Escolares (PDF) da UFOPA.
