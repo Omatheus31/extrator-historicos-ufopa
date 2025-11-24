@@ -3,7 +3,7 @@ import os
 import re
 import csv
 import xlrd
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Alignment
 
 # --- FUNÇÕES AUXILIARES (do seu script original) ---
@@ -167,20 +167,50 @@ def extrair_nome_aluno(caminho_pdf):
 def carregar_percentuais(arquivo_xls):
     percentuais = {}
     try:
-        wb = xlrd.open_workbook(arquivo_xls)
-        ws = wb.sheet_by_index(0)
-        for row_idx in range(9, ws.nrows):
-            row = ws.row_values(row_idx)
-            if len(row) > 6:
-                matricula_val = row[1]  # Coluna B (MATRICULA)
-                percentual_val = row[6]  # Coluna G (PERCENTUAL CUMPRIDO)
-                if isinstance(matricula_val, float):
-                    matricula = str(int(matricula_val))
-                else:
-                    matricula = str(matricula_val).strip()
-                percentual = str(percentual_val).strip() if percentual_val else ""
-                if matricula and percentual:
-                    percentuais[matricula] = percentual
+        # Suporta .xls (xlrd) e .xlsx (openpyxl). Detecta pela extensão do arquivo.
+        _, ext = os.path.splitext(arquivo_xls)
+        ext = ext.lower()
+
+        if ext == '.xls':
+            wb = xlrd.open_workbook(arquivo_xls)
+            ws = wb.sheet_by_index(0)
+            for row_idx in range(9, ws.nrows):
+                row = ws.row_values(row_idx)
+                if len(row) > 6:
+                    matricula_val = row[1]  # Coluna B (MATRICULA)
+                    percentual_val = row[6]  # Coluna G (PERCENTUAL CUMPRIDO)
+                    if isinstance(matricula_val, float):
+                        matricula = str(int(matricula_val))
+                    else:
+                        matricula = str(matricula_val).strip()
+                    percentual = str(percentual_val).strip() if percentual_val else ""
+                    if matricula and percentual:
+                        percentuais[matricula] = percentual
+
+        elif ext in ('.xlsx', '.xlsm', '.xltx', '.xltm'):
+            # Usa openpyxl para arquivos xlsx
+            wb = load_workbook(arquivo_xls, read_only=True, data_only=True)
+            ws = wb[wb.sheetnames[0]]
+            # openpyxl rows are 1-indexed; dados começam na linha 10 (índice humano)
+            for row_idx, row in enumerate(ws.iter_rows(values_only=True), start=1):
+                if row_idx < 10:
+                    continue
+                # row é uma tupla de valores
+                row_vals = list(row)
+                if len(row_vals) > 6:
+                    matricula_val = row_vals[1]
+                    percentual_val = row_vals[6]
+                    if isinstance(matricula_val, float):
+                        matricula = str(int(matricula_val))
+                    else:
+                        matricula = str(matricula_val).strip()
+                    percentual = str(percentual_val).strip() if percentual_val else ""
+                    if matricula and percentual:
+                        percentuais[matricula] = percentual
+
+        else:
+            print(f"   Aviso: formato de arquivo não suportado para percentuais: {arquivo_xls}")
+
     except Exception as e:
         print(f"   Aviso: não foi possível carregar percentuais de {arquivo_xls}: {e}")
     return percentuais
@@ -189,11 +219,12 @@ def carregar_percentuais(arquivo_xls):
 # --- FUNÇÃO PRINCIPAL ADAPTADA ---
 # Esta é a função que o app.py irá chamar.
 
-def run_extraction_process_web_mode(pdf_upload_folder, excel_percentual_path, output_report_folder):
+def run_extraction_process_web_mode(pdf_upload_folder, excel_percentual_path, output_report_folder, progress_callback=None):
     """
     Executa o processo de extração principal.
     Recebe os caminhos das pastas (do servidor) e gera os relatórios.
     Retorna um dicionário com os nomes dos arquivos gerados.
+    progress_callback: função opcional que recebe (current, total) para reportar progresso
     """
     
     # 1. Carrega percentuais (usando o caminho do arquivo enviado)
@@ -240,6 +271,11 @@ def run_extraction_process_web_mode(pdf_upload_folder, excel_percentual_path, ou
 
         for i, arquivo in enumerate(pdfs_encontrados):
             print(f"Processando [{i+1}/{len(pdfs_encontrados)}]: {arquivo}")
+            
+            # Reporta progresso se callback fornecido
+            if progress_callback:
+                progress_callback(i + 1, len(pdfs_encontrados))
+            
             caminho_completo = os.path.join(pdf_upload_folder, arquivo)
             
             # --- Extrai os dados do PDF ---

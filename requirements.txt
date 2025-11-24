@@ -1,6 +1,6 @@
 Flask
 Flask-CORS
 pdfplumber
-xlrd
+xlrd==1.2.0
 openpyxl
 gunicorn

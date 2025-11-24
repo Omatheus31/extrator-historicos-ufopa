@@ -5,6 +5,12 @@ const pdfFilesInput = document.getElementById('pdfFiles');
 const excelFileInput = document.getElementById('excelFile');
 const resultsArea = document.getElementById('resultsArea');
 const downloadLinksDiv = document.getElementById('downloadLinks');
+const progressContainer = document.getElementById('progressContainer');
+const progressText = document.getElementById('progressText');
+const progressPercentage = document.getElementById('progressPercentage');
+const progressFill = document.getElementById('progressFill');
+
+let eventSource = null;
 
 function updateMessages(message) {
     messagesTextArea.value += message + '\n';
@@ -18,10 +24,67 @@ function setProcessingState(isProcessing) {
         // Limpa resultados anteriores
         resultsArea.style.display = 'none';
         downloadLinksDiv.innerHTML = '';
+        // Mostra container de progresso
+        progressContainer.style.display = 'block';
+        updateProgress(0, 0);
     } else {
         extractButton.disabled = false;
         extractButton.textContent = 'Iniciar Extração';
+        // Esconde container de progresso
+        progressContainer.style.display = 'none';
     }
+}
+
+function updateProgress(current, total) {
+    if (total === 0) {
+        progressText.textContent = 'Preparando...';
+        progressPercentage.textContent = '0%';
+        progressFill.style.width = '0%';
+        return;
+    }
+    
+    const percentage = Math.round((current / total) * 100);
+    progressText.textContent = `Processando: ${current}/${total} PDFs`;
+    progressPercentage.textContent = `${percentage}%`;
+    progressFill.style.width = `${percentage}%`;
+}
+
+function startProgressListener() {
+    if (eventSource) {
+        eventSource.close();
+    }
+    
+    eventSource = new EventSource('/progress');
+    
+    eventSource.onmessage = function(event) {
+        const data = event.data;
+        
+        if (data === 'DONE') {
+            eventSource.close();
+            eventSource = null;
+            return;
+        }
+        
+        if (data === 'ping') {
+            return;
+        }
+        
+        // Formato esperado: "current/total"
+        const match = data.match(/(\d+)\/(\d+)/);
+        if (match) {
+            const current = parseInt(match[1]);
+            const total = parseInt(match[2]);
+            updateProgress(current, total);
+        }
+    };
+    
+    eventSource.onerror = function(error) {
+        console.error('Erro no EventSource:', error);
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+        }
+    };
 }
 
 async function startExtraction() {
@@ -40,6 +103,9 @@ async function startExtraction() {
 
     setProcessingState(true);
     updateMessages("Iniciando upload e extração...");
+    
+    // Inicia o listener de progresso
+    startProgressListener();
 
     const formData = new FormData();
     for (let i = 0; i < pdfFiles.length; i++) {
@@ -90,6 +156,11 @@ async function startExtraction() {
         updateMessages(`FALHA NA OPERAÇÃO: ${error.message}`);
         console.error("Erro completo:", error);
     } finally {
+        // Fecha o EventSource se ainda estiver aberto
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+        }
         // Reabilita o botão, independentemente do resultado
         setProcessingState(false);
     }

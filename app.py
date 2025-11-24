@@ -1,6 +1,8 @@
 import os
 import shutil
-from flask import Flask, request, jsonify, send_from_directory
+import threading
+import queue
+from flask import Flask, request, jsonify, send_from_directory, Response
 from werkzeug.utils import secure_filename
 from flask_cors import CORS # Para permitir a comunicação
 
@@ -10,7 +12,7 @@ from seu_script_de_extracao import run_extraction_process_web_mode
 # --- Configuração ---
 UPLOAD_FOLDER = 'uploads'
 GENERATED_REPORTS_FOLDER = 'generated_reports'
-ALLOWED_EXTENSIONS = {'pdf', 'xls'}
+ALLOWED_EXTENSIONS = {'pdf', 'xls', 'xlsx'}
 
 app = Flask(__name__, static_folder='static')
 CORS(app) # Habilita CORS para a aplicação
@@ -23,6 +25,9 @@ app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # Limite de 100MB para upl
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(GENERATED_REPORTS_FOLDER, exist_ok=True)
 
+# Fila para comunicação de progresso
+progress_queue = queue.Queue()
+
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -31,6 +36,21 @@ def allowed_file(filename):
 @app.route('/')
 def index():
     return send_from_directory(app.static_folder, 'index.html')
+
+# --- Rota para Stream de Progresso ---
+@app.route('/progress')
+def progress():
+    def generate():
+        while True:
+            try:
+                message = progress_queue.get(timeout=30)
+                if message == 'DONE':
+                    yield f"data: {message}\n\n"
+                    break
+                yield f"data: {message}\n\n"
+            except queue.Empty:
+                yield f"data: ping\n\n"
+    return Response(generate(), mimetype='text/event-stream')
 
 # --- Rota para a Extração ---
 @app.route('/upload_and_extract', methods=['POST'])
@@ -67,14 +87,26 @@ def upload_and_extract():
         return jsonify({"status": "error", "message": "Tipo de arquivo Excel não permitido ou nome inválido."}), 400
 
     try:
+        # Limpa a fila de progresso
+        while not progress_queue.empty():
+            progress_queue.get()
+        
+        # Conta o total de PDFs
+        total_pdfs = len([f for f in os.listdir(app.config['UPLOAD_FOLDER']) if f.lower().endswith('.pdf')])
+        progress_queue.put(f"0/{total_pdfs}")
+        
         # --- A MÁGICA ACONTECE AQUI ---
-        # Chama a função adaptada do seu script, passando as pastas
+        # Chama a função adaptada do seu script, passando as pastas e a fila de progresso
         output_files = run_extraction_process_web_mode(
             pdf_upload_folder=app.config['UPLOAD_FOLDER'],
             excel_percentual_path=excel_path,
-            output_report_folder=app.config['GENERATED_REPORTS_FOLDER']
+            output_report_folder=app.config['GENERATED_REPORTS_FOLDER'],
+            progress_callback=lambda current, total: progress_queue.put(f"{current}/{total}")
         )
         # --------------------------------
+        
+        # Sinaliza conclusão
+        progress_queue.put('DONE')
 
         # Prepara a resposta JSON com links para download
         response_data = {
@@ -89,6 +121,7 @@ def upload_and_extract():
 
     except Exception as e:
         print(f"Erro durante a extração: {e}")
+        progress_queue.put('DONE')
         return jsonify({"status": "error", "message": f"Erro interno durante a extração: {str(e)}"}), 500
 
 # --- Rota para Download dos Relatórios ---

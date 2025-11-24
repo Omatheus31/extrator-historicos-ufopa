@@ -25,6 +25,16 @@
 
             <button class="primary-button" id="extractButton" onclick="startExtraction()">Iniciar Extração</button>
 
+            <div id="progressContainer" class="progress-container" style="display: none;">
+                <div class="progress-info">
+                    <span id="progressText">Processando: 0/0</span>
+                    <span id="progressPercentage">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
+            </div>
+
             <div class="messages-area">
                 <label for="messages">Mensagens:</label>
                 <textarea id="messages" rows="5" readonly placeholder="Aguardando o upload dos arquivos..."></textarea>
