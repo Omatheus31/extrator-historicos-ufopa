@@ -3,3 +3,4 @@ Flask-CORS
 pdfplumber
 xlrd
 openpyxl
+gunicorn
