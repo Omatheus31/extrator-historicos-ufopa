@@ -9,6 +9,7 @@ const progressContainer = document.getElementById('progressContainer');
 const progressText = document.getElementById('progressText');
 const progressPercentage = document.getElementById('progressPercentage');
 const progressFill = document.getElementById('progressFill');
+const skipPercentuaisCheckbox = document.getElementById('skipPercentuais');
 
 let eventSource = null;
 
@@ -90,14 +91,15 @@ function startProgressListener() {
 async function startExtraction() {
     const pdfFiles = pdfFilesInput.files;
     const excelFile = excelFileInput.files[0];
+    const skipPercentuais = skipPercentuaisCheckbox ? skipPercentuaisCheckbox.checked : false;
 
     // Validação de entrada
     if (pdfFiles.length === 0) {
         updateMessages("ERRO: Por favor, selecione os arquivos PDF.");
         return;
     }
-    if (!excelFile) {
-        updateMessages("ERRO: Por favor, selecione o arquivo Excel de percentuais.");
+    if (!skipPercentuais && !excelFile) {
+        updateMessages("ERRO: Por favor, selecione o arquivo Excel de percentuais ou marque 'Extrair sem arquivo de percentuais'.");
         return;
     }
 
@@ -111,7 +113,12 @@ async function startExtraction() {
     for (let i = 0; i < pdfFiles.length; i++) {
         formData.append('pdf_files', pdfFiles[i]);
     }
-    formData.append('excel_file', excelFile);
+    if (!skipPercentuais && excelFile) {
+        formData.append('excel_file', excelFile);
+    } else if (skipPercentuais) {
+        // Indica explicitamente ao backend que ele deve pular percentuais
+        formData.append('skip_percentuals', '1');
+    }
 
     try {
         // Envia os arquivos para o endpoint /upload_and_extract no backend Flask
@@ -169,4 +176,19 @@ async function startExtraction() {
 // Inicializa a área de mensagens
 document.addEventListener('DOMContentLoaded', () => {
     updateMessages("Pronto para começar. Selecione os arquivos e clique em 'Iniciar Extração'.");
+    // Caso o checkbox exista, atualiza o estado do input do Excel
+    if (skipPercentuaisCheckbox) {
+        const toggleExcelState = () => {
+            if (skipPercentuaisCheckbox.checked) {
+                excelFileInput.disabled = true;
+                excelFileInput.parentElement.classList.add('disabled');
+            } else {
+                excelFileInput.disabled = false;
+                excelFileInput.parentElement.classList.remove('disabled');
+            }
+        };
+        skipPercentuaisCheckbox.addEventListener('change', toggleExcelState);
+        // Estado inicial
+        toggleExcelState();
+    }
 });

@@ -20,7 +20,7 @@ Aplicação web para automatizar a extração de Componentes Pendentes e Resumo 
 ## Principais melhorias nesta versão
 
 - Suporte para arquivos de percentuais em `.xls` e `.xlsx`. O backend detecta automaticamente a extensão e usa `xlrd` para `.xls` e `openpyxl` para `.xlsx`.
-- Frontend envia os campos `pdf_files` (múltiplos) e `excel_file` (um arquivo). O backend espera exatamente esses nomes.
+- Frontend envia os campos `pdf_files` (múltiplos) e `excel_file` (um arquivo). Existe também a opção de extrair sem percentuais — marque a caixa "Extrair sem percentuais" na UI para pular o upload do Excel.
 - `requirements.txt` foi atualizado para indicar `xlrd==1.2.0` (compatibilidade com arquivos `.xls`).
 
 ---
@@ -42,12 +42,21 @@ Dependências (já listadas em `requirements.txt`):
 
 ## Instalação e execução (PowerShell - Windows)
 
-Abra o PowerShell e execute os passos abaixo na pasta do projeto `extrator-historicos-ufopa`.
+Abra o PowerShell e execute os passos abaixo na pasta do projeto (ou indique a pasta
+onde quer que os `uploads/` e `generated_reports/` sejam criados).
 
-1) Navegue até a pasta do projeto:
+1) Navegue até a pasta do repositório clonado (ou escolha a pasta base desejada):
 
 ```powershell
-cd "C:\Users\User\Documents\Organização de planilhas\Extração_de_disciplinas_pendentes\Históricos\extrator-historicos-ufopa"
+# Exemplo: entre na pasta onde você clonou o repositório
+cd "C:\caminho\para\extrator_components_UFOPA"
+
+# OU: você pode executar a aplicação a partir de qualquer pasta e passar a pasta base:
+# python app.py --base-dir "C:\pasta\onde\serao\dados"
+
+# OU: exporte a variável de ambiente para definir a pasta base (PowerShell):
+# $env:EXTRACTION_BASE_DIR = 'C:\pasta\onde\serao\dados'
+# python app.py
 ```
 
 2) Crie e ative um ambiente virtual:
@@ -77,7 +86,7 @@ python .\app.py
 ## Uso da interface
 
 1. Selecione os arquivos PDF (múltiplos) no primeiro campo.
-2. Selecione o arquivo de percentuais (`.xls` ou `.xlsx`) no segundo campo.
+2. (Opcional) Selecione o arquivo de percentuais (`.xls` ou `.xlsx`) no segundo campo. Se não quiser usar percentuais, marque a opção "Extrair sem percentuais".
 3. Clique em "Iniciar Extração".
 4. Acompanhe as mensagens na área de logs; ao final, os links para download aparecerão.
 
@@ -88,7 +97,8 @@ python .\app.py
 - Endpoint: `POST /upload_and_extract`
 - Form data:
   - `pdf_files` — arquivos PDF (campo repetível / múltiplo)
-  - `excel_file` — arquivo de percentuais (`.xls` ou `.xlsx`)
+  - `excel_file` — arquivo de percentuais (`.xls` ou `.xlsx`). Opcional se enviar `skip_percentuals`.
+  - `skip_percentuals` — flag opcional (valor `1`) para indicar que a extração deve prosseguir sem arquivo de percentuais.
 - Resposta JSON (success):
   ```json
   {
