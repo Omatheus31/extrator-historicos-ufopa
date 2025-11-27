@@ -325,8 +325,8 @@ def run_extraction_process_web_mode(pdf_upload_folder, excel_percentual_path, ou
                 else:
                     writer_compacto.writerow([componente_texto, arquivo])
                     arquivo_txt.write(componente_texto + "\n")
-                    
-                    ws.append([None, None, None, None, componente_texto, None, None, None])
+                    # Repetir matrícula, nome (e percentual quando disponível) em todas as linhas
+                    ws.append([None, matricula, nome_aluno, None, componente_texto, None, None, None])
 
     # 6. Salva o Excel
     wb.save(excel_output_path)
